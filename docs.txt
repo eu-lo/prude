@@ -1,0 +1,1 @@
+A CLI tool and library for producing "prelude" files that lift declarations out of inner source packages.
