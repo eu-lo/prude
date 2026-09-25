@@ -226,6 +226,7 @@ __process_decl :: proc(
 	docs := strings.to_string(docs_buf)
 	log.debugf("Extracted docs: %w", docs)
 
+	allow := !p.is_whitelist
 	for attr in value.attributes {
 		for elem in attr.elems {
 			#partial switch fv in elem.derived {
@@ -238,6 +239,7 @@ __process_decl :: proc(
 
 				content_lit := fv.value.derived.(^ast.Basic_Lit)
 				content := content_lit.tok.text[1:len(content_lit.tok.text) - 1]
+				if p.is_whitelist && content == "prelude" do allow = true
 				extract := strings.split(content, ":", context.temp_allocator)
 				if len(extract) != 2 do continue
 				prefix := extract[0]
@@ -245,12 +247,14 @@ __process_decl :: proc(
 
 				if prefix != "prelude" do continue
 				if suffix == "_" do return
+				allow = true
 
 				name = strings.clone(suffix, context.temp_allocator)
 				log.debugf("Found new name: %v", name)
 			}
 		}
 	}
+	if !allow do return
 
 	name = strings.clone(name, context.allocator)
 	docs = strings.clone(docs, context.allocator)

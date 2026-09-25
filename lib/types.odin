@@ -28,14 +28,16 @@ Scan_Error :: enum {
 // Be sure to initialize with `prelude_init` (or allocate with `prelude_make`) and free with `prelude_destroy`.
 // Before using, set `name` and `path`.
 Prelude :: struct {
-	entries : [dynamic]Entry,
-	sources : [dynamic]Source,
+	entries :      [dynamic]Entry,
+	sources :      [dynamic]Source,
 	// An optional string with documentation that goes before the 'package' declaration.
-	docs :    string,
+	docs :         string,
 	// The name of the package. Should be set before adding any sources.
-	name :    string,
+	name :         string,
 	// The path of the resulting prelude file. Should be a file, not a directory, and have write permissions.
-	path :    string,
+	path :         string,
+	// Whether entries are whitelisted or blacklisted.
+	is_whitelist : bool,
 }
 
 // An exported entry to be placed in the prelude.

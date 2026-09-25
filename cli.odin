@@ -8,12 +8,13 @@ import "core:log"
 import "core:os"
 
 Opts :: struct {
-	overflow : [dynamic]string `usage:"Directories to include in the prelude. Does not scan subdirectories."`,
-	target :   string `usage:"Output prelude file. Defaults to 'prelude.odin'."`,
-	name :     string `usage:"Name of the package. Defaults to directory name."`,
-	docs :     ^os.File `args="file:r" usage:"File to embed into the documentation of the 'package' declaration."`,
-	quiet :    bool `usage:"Disable default log output. Setting this implicitly disables '-debug' as well."`,
-	debug :    bool `usage:"Enable debug log output."`,
+	overflow :  [dynamic]string `usage:"Directories to include in the prelude. Does not scan subdirectories."`,
+	target :    string `usage:"Output prelude file. Defaults to 'prelude.odin'."`,
+	name :      string `usage:"Name of the package. Defaults to directory name."`,
+	docs :      ^os.File `args:"file:r" usage:"File to embed into the documentation of the 'package' declaration."`,
+	quiet :     bool `usage:"Disable default log output. Setting this implicitly disables '-debug' as well."`,
+	debug :     bool `usage:"Enable debug log output."`,
+	whitelist : bool `usage:"Treat entries as whitelist rather than blacklist."`,
 }
 
 main :: proc() {
@@ -70,6 +71,8 @@ execute :: proc(opts : ^Opts) -> int {
 			opts.docs = nil
 		} else do prelude.docs = docs
 	}
+
+	prelude.is_whitelist = opts.whitelist
 
 	prelude.name = opts.name
 	prelude.path = opts.target
