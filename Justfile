@@ -18,13 +18,6 @@ alias rr := run-release
 _default: build-debug
 clean:
     rm -rf target
-docs:
-    odin doc . -all-packages -doc-format -out:docs.odin-doc
-    varde build --doc docs.odin-doc --allow-incomplete --out {{ TARGET_DIR / "docs" }} 
-docs-release:
-    # odin doc lib.odin -file > docs.odin-doc
-    # odin doc . -all-packages -doc-format -out:docs.odin-doc
-    varde build --source . --out docs --config release.varde.json
 build-debug:
     @mkdir -p {{ TARGET_DIR }}
     odin build . -debug {{ COMMON_BUILD_FLAGS }} -out:{{ DEBUG_EXE_FILE }}
