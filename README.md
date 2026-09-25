@@ -1,0 +1,72 @@
+# Prude - Odin Prelude Generator
+
+A simple [Odin](https://odin-lang.org) tool for "lifting" declarations from inner packages into an upper package by way of a "prelude" file. I guess this can technically thought of as a header file generator for odin libraries.
+
+This tool allows developers to idiomatically seperate code into a "src", "lib", or "core" folder, as is standard for most projects. Typically, doing this would require users of a library to manually path to said "src" folder in order to use it, and prevents Odin from automagically determining the name of the import. It's also an anti-pattern, forcing users to work around your internal project structure rather than letting the code describe itself. I've seen a few repos make this change anyway, however, because in the end, larger projects simply become hard to scan and work with when everything is placed into the project root.
+
+One solution to this would be to write a file in project root that re-exports symbols from the inner "src" package so that users can still clone-and-use without issue. The main issue is that this adds considerable friction to re-factoring; it essentially re-invents the concept of header files in odin. This is where Prude is designed to help: It parses a set of odin files within a folder or list of folders (i.e. a list of odin packages) and produces an odin file which re-exports every publically accessable declaration.
+
+This tool should be used sparingly! Only include things which are necessary for users of your library--remember that they can still just manually import anything within the project--all Prude does is "lift" items to the "top-level". If your project is not intended to be used as a native library by others or has some other build system that is not as simple as "clone into your project and import", then this project may not be for you. Perhaps this could have other uses, but in the end it's just a simple tool built with the core library's parser package that I found useful. I hope it proves useful to you too.
+
+## Installation
+
+You can build the project with `odin build .`. The `Justfile` exists and contains helper tasks and bootstrapping and whatnot (See [Contributing](#contributing)), but if you just want to build the project on your machine, `odin build .` will do just fine.
+
+If you want to use this project as a library (perhaps in your build script, if you have one), or if you'd rather run it using `odin run`, clone it to your project directory and import it normally:
+```
+git clone https://github.com/eu-lo/prude.git
+odin run prude -- ...
+```
+
+## Usage
+
+Prude can be used either as a CLI tool or as a library. Should you have any issues feel free to open a ticket here!
+
+### As a CLI Tool:
+```
+prude lib include          # Scans ./lib/ and ./include/, outputs to prelude.odin
+odin run prude -- lib      # If cloned to your project
+prude lib lib/core         # Prude does not scan sub-directories
+prude lib -docs:README.md  # Add file contents to package documentation
+prude src -target:lib.odin # Change target destination
+```
+
+Running `prude -help` prints:
+```
+Usage:
+        prude.exe [-debug] [-docs] [-name] [-quiet] [-target] ...
+Flags:
+        -debug            | Enable debug log output.
+        -docs:<^File>     | File to embed into the documentation of the 'package' declaration.
+        -name:<string>    | Name of the package. Defaults to directory name.
+        -quiet            | Disable default log output. Setting this implicitly disables '-debug' as well.
+        -whitelist        | Treat entries as whitelist rather than blacklist.
+        -target:<string>  | Output prelude file. Defaults to 'prelude.odin'.
+        <string, ...>     | Directories to include in the prelude. Does not scan subdirectories.
+```
+
+### As a library:
+```go
+import "prude"
+main :: proc() {
+    p : prude.Prelude
+    prude.prelude_init(&p)
+
+    // Set these before using
+    p.name = "my_package"
+    p.path = "lib.odin"
+
+    prude.add_source(&p, "path/to/package")
+    prude.output_to_file(&p)
+    result := prude.output_to_string(&p) // Can also write to string
+    // All of these return errors if any occured
+}
+```
+
+## Contributing
+
+If you want to hack away on this, be my guest! Aside from the Odin toolchain, you also need [Just](https://just.systems). To see what you can do, run `just`. Each recipe contains a small description of what it does. 
+
+## License
+
+[Unlicense](https://choosealicense.com/licenses/unlicense/)
