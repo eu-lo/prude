@@ -107,7 +107,7 @@ parse_docs_from_file :: proc(
 }
 
 // Writes prelude to file specified in `prelude.path`.
-prelude_output_to_file :: proc(p : ^Prelude) -> Error {
+output_to_file :: proc(p : ^Prelude) -> Error {
 	assert(p != nil)
 	output := strings.builder_make(context.allocator) or_return
 	defer strings.builder_destroy(&output)
@@ -121,7 +121,7 @@ prelude_output_to_file :: proc(p : ^Prelude) -> Error {
 // ## Allocations
 // This allocates a strings.Builder using the provided allocator.
 // The returned string needs to be freed by the caller.
-prelude_output_to_string :: proc(
+output_to_string :: proc(
 	p : ^Prelude,
 	allocator := context.allocator,
 ) -> (
@@ -137,7 +137,7 @@ prelude_output_to_string :: proc(
 
 // Adds source to prelude using a specified path to directory.
 // `path` should be a directory.
-prelude_add_source :: proc(p : ^Prelude, path : string) -> Error {
+add_source :: proc(p : ^Prelude, path : string) -> Error {
 	assert(p != nil)
 	dir := os.open(path) or_return
 	info := os.stat(path, context.temp_allocator) or_return
@@ -162,7 +162,7 @@ prelude_add_source :: proc(p : ^Prelude, path : string) -> Error {
 		if fext != ".odin" do continue
 
 		f := os.open(file.fullpath) or_return
-		prelude_add_file(p, &source, f)
+		add_file(p, &source, f)
 	}
 	os.file_info_slice_delete(files, context.allocator)
 
@@ -171,11 +171,7 @@ prelude_add_source :: proc(p : ^Prelude, path : string) -> Error {
 	return nil
 }
 
-prelude_add_file :: proc(
-	p : ^Prelude,
-	source : ^Source,
-	file : ^os.File,
-) -> Error {
+add_file :: proc(p : ^Prelude, source : ^Source, file : ^os.File) -> Error {
 	assert(p != nil)
 	info := os.fstat(file, context.temp_allocator) or_return
 	fext := os.ext(info.fullpath)
@@ -223,6 +219,7 @@ __process_decl :: proc(
 ) {
 	assert(p != nil)
 	log.debugf("Begin processing declaration")
+	// TODO: handle `when` blocks
 	value, ok := decl.derived_stmt.(^ast.Value_Decl)
 	if !ok do return
 	assert(len(value.names) > 0)

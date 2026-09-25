@@ -80,7 +80,7 @@ execute :: proc(opts : ^Opts) -> int {
 	had_err := false
 	for path in opts.overflow {
 		log.infof("Adding source '%v'", path)
-		err := lib.prelude_add_source(&prelude, path)
+		err := lib.add_source(&prelude, path)
 		if err != nil {
 			had_err = true
 			log.warnf("Error adding source: %v", err)
@@ -93,7 +93,7 @@ execute :: proc(opts : ^Opts) -> int {
 		return 1
 	}
 
-	err := lib.prelude_output_to_file(&prelude)
+	err := lib.output_to_file(&prelude)
 	if err != nil {
 		log.errorf("Erroring outputting to file: %v, removing output.", err)
 		oerr := os.remove(prelude.path)

@@ -41,20 +41,20 @@ parse_docs :: lib.parse_docs
 parse_docs_from_file :: lib.parse_docs_from_file
 
 // Writes prelude to file specified in `prelude.path`.
-prelude_output_to_file :: lib.prelude_output_to_file
+output_to_file :: lib.output_to_file
 
 // Writes prelude output to string.
 //
 // ## Allocations
 // This allocates a strings.Builder using the provided allocator.
 // The returned string needs to be freed by the caller.
-prelude_output_to_string :: lib.prelude_output_to_string
+output_to_string :: lib.output_to_string
 
 // Adds source to prelude using a specified path to directory.
 // `path` should be a directory.
-prelude_add_source :: lib.prelude_add_source
+add_source :: lib.add_source
 
-prelude_add_file :: lib.prelude_add_file
+add_file :: lib.add_file
 
 // Errors than can occur during scanning and generation.
 Error :: lib.Error
