@@ -17,14 +17,17 @@ alias rr := run-release
 
 _default: build-debug
 clean:
+    rm -f prelude.odin
     rm -rf target
 build-debug:
     @mkdir -p {{ TARGET_DIR }}
     odin build . -debug {{ COMMON_BUILD_FLAGS }} -out:{{ DEBUG_EXE_FILE }}
 run-debug *ARGS: build-debug
     -{{ DEBUG_EXE_FILE }} {{ ARGS }}
-build-release:
+build-release: build-debug
+    @rm -f prelude.odin
     @mkdir -p {{ TARGET_DIR }}
+    {{ DEBUG_EXE_FILE }} lib -docs:docs.txt
     odin build . {{ COMMON_BUILD_FLAGS }} -o:speed -out:{{ RELEASE_EXE_FILE }}
 run-release *ARGS: build-release
     -{{ RELEASE_EXE_FILE }} {{ ARGS }}
