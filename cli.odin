@@ -26,13 +26,17 @@ main :: proc() {
 
 	logger := context.logger
 	if !opts.quiet {
+		options := log.Options{.Level, .Terminal_Color}
 		level : log.Level = .Info
-		if opts.debug do level = .Debug
-		logger = log.create_console_logger(level)
+		if opts.debug {
+			level = .Debug
+			options += {.Short_File_Path, .Line, .Time}
+		}
+		logger = log.create_console_logger(level, options)
 	}
 	context.logger = logger
 
-	log.info("Successfully initialized logging utilities!")
+	log.debug("Successfully initialized logging utilities!")
 
 	os.exit(execute(&opts))
 }
