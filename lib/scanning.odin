@@ -116,6 +116,25 @@ prelude_output_to_file :: proc(p : ^Prelude) -> Error {
 	return nil
 }
 
+// Writes prelude output to string.
+//
+// ## Allocations
+// This allocates a strings.Builder using the provided allocator.
+// The returned string needs to be freed by the caller.
+prelude_output_to_string :: proc(
+	p : ^Prelude,
+	allocator := context.allocator,
+) -> (
+	res : string,
+	err : runtime.Allocator_Error,
+) {
+	assert(p != nil)
+	output := strings.builder_make(allocator) or_return
+	defer strings.builder_destroy(&output)
+	write_package(&output, p)
+	return strings.clone(strings.to_string(output), allocator)
+}
+
 // Adds source to prelude using a specified path to directory.
 // `path` should be a directory.
 prelude_add_source :: proc(p : ^Prelude, path : string) -> Error {
