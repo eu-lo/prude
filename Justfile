@@ -13,6 +13,8 @@ alias rd := run-debug
 alias br := build-release
 alias rr := run-release
 
+alias build := build-release
+
 _default:
     @just --list
 
@@ -30,10 +32,9 @@ build-debug: clean
 run-debug *ARGS: build-debug
     -{{ DEBUG_EXE_FILE }} {{ ARGS }}
 
-# Builds project in release mode. Before building it uses a debug build to generate the prelude file.
-build-release: build-debug
+# Builds project in release mode.
+build-release:
     @mkdir -p {{ TARGET_DIR }}
-    {{ DEBUG_EXE_FILE }} lib -docs:include.txt
     odin build . {{ COMMON_BUILD_FLAGS }} -o:speed -out:{{ RELEASE_EXE_FILE }}
 
 # Runs project in release mode.

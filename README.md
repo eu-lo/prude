@@ -10,7 +10,7 @@ This tool should be used sparingly! Only include things which are necessary for 
 
 ## Installation
 
-You can build the project with `odin build .`. The `Justfile` exists and contains helper tasks and bootstrapping and whatnot (See [Contributing](#contributing)), but if you just want to build the project on your machine, `odin build .` will do just fine.
+You can build the project with `odin build .`. The `Justfile` exists and contains various helper tasks whatnot (See [Contributing](#contributing)), but if you just want to build the project on your machine, `odin build .` will do just fine.
 
 If you want to use this project as a library (perhaps in your build script, if you have one), or if you'd rather run it using `odin run`, clone it to your project directory and import it normally:
 ```
