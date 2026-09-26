@@ -63,6 +63,75 @@ main :: proc() {
 }
 ```
 
+## Features
+
+* Simple prelude file generation:
+    ```go
+    package lib
+    Item :: struct { ... }
+    procedure :: proc() { ... }
+    constant :: 10
+
+    package net
+    OtherItem :: struct { ... }
+    Error :: enum { ... }
+
+    // "prelude.odin"
+    import "lib"
+    import "net"
+
+    Item :: lib.Item
+    procedure :: lib.procedure
+    constant :: lib.constant
+    OtherItem :: net.OtherItem
+    Error :: net.Error
+    ```
+
+* Individual item renaming:
+    ```go
+    package net
+
+    OtherItem :: struct { ... }
+    @(tag = "prelude:Net_Error")
+    Error :: enum { ... }
+
+    // "prelude.odin"
+    import "net"
+
+    OtherItem :: net.Item
+    Net_Error :: lib.Error
+    ```
+
+* Blacklist mode:
+    ```go
+    package net
+
+    OtherItem :: struct { ... }
+    @(tag = "prelude:_")
+    Error :: enum { ... }
+
+    // "prelude.odin"
+    import "net"
+
+    OtherItem :: net.Item
+    ```
+
+* Whitelist mode:
+    ```go
+    package net
+
+    @(tag = "prelude")
+    OtherItem :: struct { ... }
+    Error :: enum { ... }
+
+    // "prelude.odin"
+    import "net"
+
+    OtherItem :: net.Item
+    ```
+
+    To use whitelist mode, run `prude` with `-whitelist`. If using the library, set `is_whitelist` on the `Prelude` object being adding sources.
+
 ## Contributing
 
 If you want to hack away on this, be my guest! Aside from the Odin toolchain, you also need [Just](https://just.systems). To see what you can do, run `just`. Each recipe contains a small description of what it does. 
