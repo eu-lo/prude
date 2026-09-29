@@ -23,6 +23,10 @@ clean:
     rm -f prelude.odin
     rm -rf target
 
+# Runs all library tests
+test: clean
+    odin test tests
+
 # Builds project in debug mode.
 build-debug: clean
     @mkdir -p {{ TARGET_DIR }}
