@@ -8,43 +8,30 @@ import "core:odin/parser"
 import "core:os"
 import "core:strings"
 
-// Zero-initializes prelude. Allocates dynamic arrays for the entries and sources using provided allocator.
-// You should also set `name` and `path` after calling this.
-prelude_init :: proc(
-	p : ^Prelude,
+@(tag = "prelude:_")
+name_from_path :: proc(
+	path : string,
+	level : int,
 	allocator := context.allocator,
-	loc := #caller_location,
-) -> runtime.Allocator_Error {
-	p^ = {}
-	p.entries = make([dynamic]Entry, allocator, loc) or_return
-	p.sources = make([dynamic]Source, allocator, loc) or_return
-	return nil
-}
-
-// Allocates prelude on the heap and initializes it.
-prelude_make :: proc(
-	allocator := context.allocator,
-	loc := #caller_location,
 ) -> (
-	p : ^Prelude,
-	err : runtime.Allocator_Error,
-) #optional_allocator_error {
-	p = new(Prelude, allocator, loc) or_return
-	prelude_init(p) or_return
-	return p, err
-}
-
-// Frees prelude its contained dynamic arrays.
-prelude_destroy :: proc(
-	p : ^Prelude,
-	allocator := context.allocator,
-	loc := #caller_location,
-) -> runtime.Allocator_Error {
-	assert(p != nil)
-	delete(p.entries, loc) or_return
-	delete(p.sources, loc) or_return
-	free(p, allocator, loc) or_return
-	return nil
+	name : string,
+	ok : bool,
+) {
+	level := level
+	ok = true
+	path_parts := strings.split(
+		path,
+		os.Path_Separator_String,
+		context.temp_allocator,
+	)
+	level = len(path_parts) - level - 1
+	if level < 0 {
+		ok = false
+		level = 0
+	}
+	parts := path_parts[level:]
+	name = strings.join(parts, "_", allocator)
+	return
 }
 
 // Parses a string into an odin-compliant docstring, ideally to be placed into a `Prelude`.
@@ -59,8 +46,6 @@ parse_docs :: proc(
 	res : string,
 	err : Error,
 ) {
-	defer free_all(context.temp_allocator)
-
 	log.debugf("Parsing docs:\n%v", docs)
 	buf := strings.builder_make(context.temp_allocator) or_return
 	lines := strings.split_lines(
@@ -92,8 +77,6 @@ parse_docs_from_file :: proc(
 	err : Error,
 ) {
 	log.ensure(file != nil)
-	defer free_all(context.temp_allocator)
-
 	if context.logger.lowest_level == .Debug {
 		// No need to allocate if the log won't be printed
 		info := os.fstat(file, context.allocator) or_return
@@ -144,9 +127,37 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 	defer os.file_info_delete(info, context.temp_allocator)
 	if info.type != .Directory do return .Not_A_Directory
 
-	// TODO: Handle duplicate source names
-	name := strings.clone(info.name)
-	path := os.join_path({os.dir(p.path), path}, context.allocator) or_return
+	path := os.join_path(
+		{os.dir(p.path), path},
+		context.temp_allocator,
+	) or_return
+	name, ok := name_from_path(path, 0)
+	assert(ok)
+
+	level, idx : int
+	for {
+		matched := false
+		for source in p.sources {
+			if source.name == name {
+				matched = true
+				level += 1
+				name, ok = name_from_path(path, level)
+				if !ok {
+					idx += 1
+					name = fmt.aprint(name, idx, sep = "")
+				}
+				log.warnf(
+					"Source '%v' (at '%v') has name collision, resolved to '%v'",
+					source.name,
+					path,
+					name,
+				)
+			}
+		}
+		if !matched do break
+	}
+
+	path, _ = strings.replace(path, os.Path_Separator_String, "/", -1)
 
 	source := Source {
 		name = name,
@@ -166,7 +177,7 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 	}
 	os.file_info_slice_delete(files, context.allocator)
 
-	append(&p.sources, source) or_return
+	append(&p.sources, source)
 
 	return nil
 }
@@ -183,19 +194,22 @@ add_file :: proc(p : ^Prelude, source : ^Source, file : ^os.File) -> Error {
 	data := os.read_entire_file(file, context.temp_allocator) or_return
 
 	ast_parser : parser.Parser
-	ast_file := ast.File {
-		src      = string(data),
-		fullpath = info.fullpath,
-	}
-	parse_ok := parser.parse_file(&ast_parser, &ast_file)
-	if !parse_ok {
-		return .Invalid_Odin_Code
+	ast_file : ast.File
+	{
+		context.allocator = context.temp_allocator
+		ast_file = ast.File {
+			src      = string(data),
+			fullpath = info.fullpath,
+		}
+		parse_ok := parser.parse_file(&ast_parser, &ast_file)
+		if !parse_ok {
+			return .Invalid_Odin_Code
+		}
 	}
 	for decl in ast_file.decls {
 		__process_decl(p, data, decl, source) or_return
 	}
 
-	free_all(context.temp_allocator)
 	return nil
 }
 
@@ -274,17 +288,30 @@ __process_decl :: proc(
 
 	name = strings.clone(name, context.allocator)
 	docs = strings.clone(docs, context.allocator)
-	source := fmt.aprintf(
+	source_name := fmt.aprintf(
 		"%v.%v",
 		source.name,
 		target,
 		allocator = context.allocator,
 	)
-	log.debugf("Composed source: %v", source)
+	log.debugf("Composed source: %v", source_name)
+
+	for entry in p.entries {
+		if entry.name == name {
+			old_name := name
+			name = fmt.aprint(source.name, "_", name, sep = "")
+			log.warnf(
+				"Entry '%v' (in '%v') had name collision, resolved to '%v'",
+				old_name,
+				source.name,
+				name,
+			)
+		}
+	}
 
 	entry := Entry {
 		name          = name,
-		source        = source,
+		source        = source_name,
 		documentation = docs,
 	}
 

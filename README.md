@@ -130,7 +130,7 @@ main :: proc() {
     OtherItem :: net.Item
     ```
 
-    To use whitelist mode, run `prude` with `-whitelist`. If using the library, set `is_whitelist` on the `Prelude` object being adding sources.
+    To use whitelist mode, run `prude` with `-whitelist`. If using the library, set `is_whitelist` on the `Prelude` object before adding sources.
 
 ## Contributing
 

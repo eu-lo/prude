@@ -13,14 +13,16 @@ Error :: union {
 // An error that occured during the scanning phase.
 Scan_Error :: enum {
 	None,
-	// Attempted to scan a non-odin file. This only occurs when manually adding paths via `prelude_add_file`.
+	// Attempted to scan a non-odin file. This only occurs when manually adding paths via `prelude_add_file`. Non-odin files read through `add_source` are skipped.
 	Non_Odin_File,
 	// Attempted to scan a path that did not lead to a file.
 	Not_A_File,
-	// Odin could not successfully finishing parsing. Run `odin check` on it and see what's wrong.
+	// Odin could not successfully finishing parsing. Run `odin check` on the package and see what's wrong.
+	// If `odin check` is alright and you are still receiving this error, please report the issue to the Odin github as it would be an issue with the parser package.
 	Invalid_Odin_Code,
 	// Attempted to add source with path that was not a directory.
-	// Prude only works with entire packages, not individual files.
+	// Sources only work with entire packages, not individual files.
+	// This is not reccomended, but if you really need to scan individual files, use `add_file`.
 	Not_A_Directory,
 }
 
@@ -38,6 +40,58 @@ Prelude :: struct {
 	path :         string,
 	// Whether entries are whitelisted or blacklisted.
 	is_whitelist : bool,
+	// The allocator used to allocate all the strings. Needed for proper destruction.
+	allocator :    runtime.Allocator,
+}
+
+// Zero-initializes prelude and allocates dynamic arrays for the entries and sources using provided allocator.
+// The allocator is stored in the struct to allow `prelude_destroy` to work correctly
+// You should also set `name` and `path` after calling this.
+prelude_init :: proc(
+	p : ^Prelude,
+	allocator := context.allocator,
+	loc := #caller_location,
+) {
+	assert(p != nil)
+	p^ = {}
+	p.allocator = allocator
+	p.entries = make([dynamic]Entry, allocator, loc)
+	p.sources = make([dynamic]Source, allocator, loc)
+}
+
+// Allocates prelude on the heap and initializes it.
+prelude_make :: proc(
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (
+	p : ^Prelude,
+	err : runtime.Allocator_Error,
+) #optional_allocator_error {
+	p = new(Prelude, allocator, loc) or_return
+	prelude_init(p, allocator, loc)
+	return
+}
+
+// Frees prelude and its contained dynamic arrays.
+prelude_destroy :: proc(
+	p : ^Prelude,
+	loc := #caller_location,
+) -> runtime.Allocator_Error {
+	assert(p != nil)
+	allocator := p.allocator
+	for entry in p.entries {
+		delete(entry.name, allocator)
+		delete(entry.source, allocator)
+		delete(entry.documentation, allocator)
+	}
+	delete(p.entries, loc) or_return
+	for source in p.sources {
+		delete(source.name, allocator)
+		delete(source.path, allocator)
+	}
+	delete(p.sources, loc) or_return
+	free(p, allocator, loc) or_return
+	return nil
 }
 
 // An exported entry to be placed in the prelude.
