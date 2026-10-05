@@ -1,6 +1,8 @@
 package tests
 
 import "../lib"
+import "core:fmt"
+import "core:log"
 import "core:testing"
 
 @(test)
@@ -116,5 +118,32 @@ test_whitelist :: proc(t : ^testing.T) {
 			expected := expected_entries[i]
 			testing.expect_value(t, real, expected)
 		}
+	}
+}
+
+@(test)
+test_whens :: proc(t : ^testing.T) {
+	p, e := lib.prelude_make()
+	testing.expect_value(t, e, nil)
+	defer lib.prelude_destroy(p)
+	defer free_all(context.temp_allocator)
+
+	p.name = "whens"
+	p.path = "prelude.odin"
+
+	we := lib.add_source(p, "tests/files/whens")
+	testing.expect_value(t, we, nil)
+
+	expected_entries := [?]lib.Entry {
+		{name = "Outer_Struct", source = "whens.Outer_Struct"},
+		{name = "Forever_Struct", source = "whens.Forever_Struct"},
+	}
+
+	testing.expect_value(t, len(p.entries), len(expected_entries))
+
+	for i := 0; i < len(p.entries) - 1; i += 1 {
+		real := p.entries[i]
+		expected := expected_entries[i]
+		testing.expect_value(t, real, expected)
 	}
 }

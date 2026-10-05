@@ -132,6 +132,43 @@ main :: proc() {
 
     To use whitelist mode, run `prude` with `-whitelist`. If using the library, set `is_whitelist` on the `Prelude` object before adding sources.
 
+### Caveats
+
+Prude *will* parse `when` statements and any declarations within them, but will force `whitelist` mode when doing so. Prude does **not** do any analysis of your code and so there isn't a safe way to properly import declarations within when statements. Typically, you should write a seperate file adjacent to the prelude yourself and manually maintain the compile-time conditions, but if you are sure it's safe to import a certain item you can add `@(tag = "prelude")` above it to force-import the item. If the same item is imported multiple times, Prude will not import it more than once.
+
+Here's an example of how this might work:
+
+```go
+package lib
+
+// Different layouts per architecture, but the import exists no matter what, so it's safe to let prude handle it.
+when ODIN_OS == .Windows {
+    @(tag = "prelude")
+    Arch_Specific_Layout :: struct { ... }
+} else {
+    @(tag = "prelude")
+    Arch_Specific_Layout :: struct { ... }
+}
+
+// This is only conditionally computed. Because you can use more complex conditions (with custom defines and whatnot), prude ignores this by default.
+when ODIN_DEBUG {
+    Debug_Only_Struct :: struct { ... }
+}
+
+// "prelude.odin"
+import "lib"
+
+Arch_Specific_Layout :: lib.Arch_Specific_Layout
+
+// "prelude_footer.odin"
+import "lib"
+
+// This ensures release builds aren't broken by prude
+when ODIN_DEBUG {
+    Debug_Only_Struct :: lib.Debug_Only_Struct
+}
+```
+
 ## Contributing
 
 If you want to hack away on this, be my guest! Aside from the Odin toolchain, you also need [Just](https://just.systems). To see what you can do, run `just`. Each recipe contains a small description of what it does. 
