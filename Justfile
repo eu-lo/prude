@@ -6,7 +6,7 @@ DEBUG_EXE_NAME := EXE_NAME + "_debug"
 RELEASE_EXE_FILE := TARGET_DIR / EXE_NAME + ".exe"
 DEBUG_EXE_FILE := TARGET_DIR / DEBUG_EXE_NAME + ".exe"
 
-COMMON_BUILD_FLAGS := "-vet-style -vet-semicolon"
+COMMON_BUILD_FLAGS := "-vet-style -vet-semicolon -vet-shadowing"
 
 alias bd := build-debug
 alias rd := run-debug
@@ -25,7 +25,7 @@ clean:
 
 # Runs all library tests
 test: clean
-    odin test tests
+    odin test tests -define:ODIN_TEST_THREADS=1
 
 # Builds project in debug mode.
 build-debug: clean
