@@ -1,6 +1,7 @@
 package core
 
 import "base:runtime"
+import "core:log"
 import "core:os"
 
 // Errors than can occur during scanning and generation.
@@ -44,21 +45,6 @@ Prelude :: struct {
 	allocator :    runtime.Allocator,
 }
 
-// Zero-initializes prelude and allocates dynamic arrays for the entries and sources using provided allocator.
-// The allocator is stored in the struct to allow `prelude_destroy` to work correctly
-// You should also set `name` and `path` after calling this.
-prelude_init :: proc(
-	p : ^Prelude,
-	allocator := context.allocator,
-	loc := #caller_location,
-) {
-	assert(p != nil)
-	p^ = {}
-	p.allocator = allocator
-	p.entries = make([dynamic]Entry, allocator, loc)
-	p.sources = make([dynamic]Source, allocator, loc)
-}
-
 // Allocates prelude on the heap and initializes it.
 prelude_make :: proc(
 	allocator := context.allocator,
@@ -68,29 +54,26 @@ prelude_make :: proc(
 	err : runtime.Allocator_Error,
 ) #optional_allocator_error {
 	p = new(Prelude, allocator, loc) or_return
-	prelude_init(p, allocator, loc)
+	// prelude_init(p, allocator, loc)
 	return
 }
 
 // Frees prelude and its contained dynamic arrays.
-prelude_destroy :: proc(
-	p : ^Prelude,
-	loc := #caller_location,
-) -> runtime.Allocator_Error {
-	assert(p != nil)
+prelude_destroy :: proc(p : ^Prelude) -> runtime.Allocator_Error {
 	allocator := p.allocator
+	if allocator == {} do return nil
 	for entry in p.entries {
-		delete(entry.name, allocator)
-		delete(entry.source, allocator)
-		delete(entry.documentation, allocator)
+		delete(entry.name, allocator) or_return
+		delete(entry.source, allocator) or_return
+		delete(entry.documentation, allocator) or_return
 	}
-	delete(p.entries, loc) or_return
+	delete(p.entries) or_return
 	for source in p.sources {
-		delete(source.name, allocator)
-		delete(source.path, allocator)
+		delete(source.name, allocator) or_return
+		delete(source.path, allocator) or_return
 	}
-	delete(p.sources, loc) or_return
-	free(p, allocator, loc) or_return
+	delete(p.sources) or_return
+	free(p, allocator) or_return
 	return nil
 }
 

@@ -118,20 +118,29 @@ output_to_string :: proc(
 	return strings.clone(strings.to_string(output), allocator)
 }
 
+@(private)
+__prelude_init :: proc(p : ^Prelude) {
+	if p.allocator == {} do p.allocator = context.allocator
+	if p.sources.allocator == {} do p.sources.allocator = p.allocator
+	if p.entries.allocator == {} do p.entries.allocator = p.allocator
+}
+
 // Adds source to prelude using a specified path to directory.
 // `path` should be a directory.
 add_source :: proc(p : ^Prelude, path : string) -> Error {
 	assert(p != nil)
+	__prelude_init(p)
+
 	dir := os.open(path) or_return
 	info := os.stat(path, context.temp_allocator) or_return
 	defer os.file_info_delete(info, context.temp_allocator)
 	if info.type != .Directory do return .Not_A_Directory
 
-	path := os.join_path(
+	joined_path := os.join_path(
 		{os.dir(p.path), path},
 		context.temp_allocator,
 	) or_return
-	name, ok := name_from_path(path, 0)
+	name, ok := name_from_path(joined_path, 0, p.allocator)
 	assert(ok)
 
 	level, idx : int
@@ -141,7 +150,7 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 			if source.name == name {
 				matched = true
 				level += 1
-				name, ok = name_from_path(path, level)
+				name, ok = name_from_path(joined_path, level)
 				if !ok {
 					idx += 1
 					name = fmt.aprint(name, idx, sep = "")
@@ -149,7 +158,7 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 				log.warnf(
 					"Source '%v' (at '%v') has name collision, resolved to '%v'",
 					source.name,
-					path,
+					joined_path,
 					name,
 				)
 			}
@@ -157,15 +166,23 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 		if !matched do break
 	}
 
-	path, _ = strings.replace(path, os.Path_Separator_String, "/", -1)
+	was_alloc : bool
+	joined_path, was_alloc = strings.replace(
+		joined_path,
+		os.Path_Separator_String,
+		"/",
+		-1,
+		allocator = p.allocator,
+	)
+	if !was_alloc do joined_path = strings.clone(joined_path, p.allocator)
 
 	source := Source {
 		name = name,
-		path = path,
+		path = joined_path,
 	}
 	log.debugf("New source: %v", source)
 
-	files := os.read_directory(dir, -1, context.allocator) or_return
+	files := os.read_directory(dir, -1, context.temp_allocator) or_return
 	for file in files {
 		if file.type != .Regular do continue
 
@@ -175,7 +192,6 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 		f := os.open(file.fullpath) or_return
 		add_file(p, &source, f)
 	}
-	os.file_info_slice_delete(files, context.allocator)
 
 	append(&p.sources, source)
 
@@ -184,6 +200,8 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 
 add_file :: proc(p : ^Prelude, source : ^Source, file : ^os.File) -> Error {
 	assert(p != nil)
+	__prelude_init(p)
+
 	info := os.fstat(file, context.temp_allocator) or_return
 	fext := os.ext(info.fullpath)
 	if info.type != .Regular do return .Not_A_File
@@ -232,8 +250,35 @@ __process_decl :: proc(
 	err : Error,
 ) {
 	assert(p != nil)
+	__prelude_init(p)
+
 	log.debugf("Begin processing declaration")
-	// TODO: handle `when` blocks
+	if stmt, ok := decl.derived_stmt.(^ast.When_Stmt); ok {
+		log.debug("Found when statement")
+		block, bok := stmt.body.derived.(^ast.Block_Stmt)
+		if !bok do return
+		else_stmt : Maybe(^ast.Block_Stmt)
+		if stmt.else_stmt != nil {
+			eok : bool
+			else_stmt, eok = stmt.else_stmt.derived.(^ast.Block_Stmt)
+			if !eok { else_stmt = nil }
+		}
+		old_whitelist := p.is_whitelist
+		defer p.is_whitelist = old_whitelist
+		p.is_whitelist = true
+		for stmt in block.stmts {
+			e := __process_decl(p, data, stmt, source)
+			if e != nil do return e
+		}
+		switch eblock in else_stmt {
+		case ^ast.Block_Stmt:
+			for stmt in eblock.stmts {
+				e := __process_decl(p, data, stmt, source)
+				if e != nil do return e
+			}
+		}
+		return
+	}
 	value, ok := decl.derived_stmt.(^ast.Value_Decl)
 	if !ok do return
 	assert(len(value.names) > 0)
@@ -286,26 +331,39 @@ __process_decl :: proc(
 	}
 	if !allow do return
 
-	name = strings.clone(name, context.allocator)
-	docs = strings.clone(docs, context.allocator)
+	name = strings.clone(name, p.allocator)
+	docs = strings.clone(docs, p.allocator)
 	source_name := fmt.aprintf(
 		"%v.%v",
 		source.name,
 		target,
-		allocator = context.allocator,
+		allocator = p.allocator,
 	)
 	log.debugf("Composed source: %v", source_name)
 
 	for entry in p.entries {
 		if entry.name == name {
+			if entry.source == source_name {
+				delete(name, p.allocator)
+				delete(docs, p.allocator)
+				delete(source_name, p.allocator)
+				return
+			}
 			old_name := name
-			name = fmt.aprint(source.name, "_", name, sep = "")
+			name = fmt.aprint(
+				source.name,
+				"_",
+				name,
+				sep = "",
+				allocator = p.allocator,
+			)
 			log.warnf(
 				"Entry '%v' (in '%v') had name collision, resolved to '%v'",
 				old_name,
 				source.name,
 				name,
 			)
+			delete(old_name, p.allocator)
 		}
 	}
 

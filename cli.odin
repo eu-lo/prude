@@ -5,6 +5,7 @@ import "lib"
 import "base:runtime"
 import "core:flags"
 import "core:log"
+import "core:mem"
 import "core:os"
 
 Opts :: struct {
@@ -18,6 +19,28 @@ Opts :: struct {
 }
 
 main :: proc() {
+	os.exit(run())
+}
+
+run :: proc() -> int {
+	when ODIN_DEBUG {
+		track : mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		context.allocator = mem.tracking_allocator(&track)
+		defer mem.tracking_allocator_destroy(&track)
+		defer {
+			for _, leak in track.allocation_map {
+				log.errorf(
+					"Leak in (%v %v:%v): %v bytes.",
+					leak.location.file_path,
+					leak.location.line,
+					leak.location.column,
+					leak.size,
+				)
+			}
+		}
+	}
+
 	opts : Opts
 	flags.parse_or_exit(&opts, os.args, .Odin)
 
@@ -39,7 +62,7 @@ main :: proc() {
 
 	log.debug("Successfully initialized logging utilities!")
 
-	os.exit(execute(&opts))
+	return execute(opts)
 }
 
 // Sets default arguments for options if not specified.
@@ -60,12 +83,19 @@ opts_init_defaults :: proc(opts : ^Opts) {
 	}
 }
 
-execute :: proc(opts : ^Opts) -> int {
-	prelude : lib.Prelude
-	lib.prelude_init(&prelude)
+execute :: proc(opts : Opts) -> int {
+	opts := opts
+	defer free_all(context.temp_allocator)
+	prelude, perr := lib.prelude_make()
+	if perr != nil {
+		log.errorf("Error allocating prelude: %v", perr)
+		return 3
+	}
+	defer lib.prelude_destroy(prelude)
+	// lib.prelude_init(&prelude)
 
 	if opts.docs != nil {
-		docs, e := lib.parse_docs_from_file(opts.docs)
+		docs, e := lib.parse_docs_from_file(opts.docs, context.temp_allocator)
 		if e != nil {
 			log.warnf("Error parsing docs: %v", e)
 			opts.docs = nil
@@ -80,7 +110,7 @@ execute :: proc(opts : ^Opts) -> int {
 	had_err := false
 	for path in opts.overflow {
 		log.infof("Adding source '%v'", path)
-		err := lib.add_source(&prelude, path)
+		err := lib.add_source(prelude, path)
 		if err != nil {
 			had_err = true
 			log.warnf("Error adding source: %v", err)
@@ -93,7 +123,7 @@ execute :: proc(opts : ^Opts) -> int {
 		return 1
 	}
 
-	err := lib.output_to_file(&prelude)
+	err := lib.output_to_file(prelude)
 	if err != nil {
 		log.errorf("Erroring outputting to file: %v, removing output.", err)
 		oerr := os.remove(prelude.path)

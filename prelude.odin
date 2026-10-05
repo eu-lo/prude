@@ -62,11 +62,6 @@ Scan_Error :: lib.Scan_Error
 // Before using, set `name` and `path`.
 Prelude :: lib.Prelude
 
-// Zero-initializes prelude and allocates dynamic arrays for the entries and sources using provided allocator.
-// The allocator is stored in the struct to allow `prelude_destroy` to work correctly
-// You should also set `name` and `path` after calling this.
-prelude_init :: lib.prelude_init
-
 // Allocates prelude on the heap and initializes it.
 prelude_make :: lib.prelude_make
 
