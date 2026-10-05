@@ -358,7 +358,7 @@ __process_decl :: proc(
 				allocator = p.allocator,
 			)
 			log.warnf(
-				"Entry '%v' (in '%v') had name collision, resolved to '%v'",
+				"Entry '%v' (in '%v') had name collision, resolved to '%v'. Consider manually renaming this entry.",
 				old_name,
 				source.name,
 				name,
