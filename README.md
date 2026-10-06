@@ -116,7 +116,7 @@ main :: proc() {
     Net_Error :: lib.Error
     ```
 
-* Blacklist mode:
+* Blacklist mode (on by default):
     ```go
     package net
 
@@ -145,7 +145,7 @@ main :: proc() {
     ```
 
     To use whitelist mode, run `prude` with `-whitelist`. If using the library, set `is_whitelist` on the `Prelude` object before adding sources.
-    `when` statements and files with file suffixes automatically use whitelist mode (See [Caveats][#caveats]).
+    `when` statements and files with file suffixes automatically use whitelist mode (See [Caveats](#caveats)).
 
 ### Caveats
 
