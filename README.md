@@ -2,6 +2,13 @@
 
 A simple [Odin](https://odin-lang.org) tool for "lifting" declarations from inner packages into an upper package by way of a "prelude" file. I guess this can technically thought of as a header file generator for odin libraries.
 
+## Quickstart
+```
+git clone https://github.com/eu-lo/prude.git
+odin run prude -- path/to/lib 
+```
+
+## Rationale 
 This tool allows developers to idiomatically seperate code into a "src", "lib", or "core" folder, as is standard for most projects. Typically, doing this would require users of a library to manually path to said "src" folder in order to use it, and prevents Odin from automagically determining the name of the import. It's also an anti-pattern, forcing users to work around your internal project structure rather than letting the code describe itself. I've seen a few repos make this change anyway, however, because in the end, larger projects simply become hard to scan and work with when everything is placed into the project root.
 
 One solution to this would be to write a file in project root that re-exports symbols from the inner "src" package so that users can still clone-and-use without issue. The main issue is that this adds considerable friction to re-factoring; it essentially re-invents the concept of header files in odin. This is where Prude is designed to help: It parses a set of odin files within a folder or list of folders (i.e. a list of odin packages) and produces an odin file which re-exports every publically accessable declaration.
@@ -87,6 +94,7 @@ main :: proc() {
     Conflicting_Item :: enum { ... }
 
     // "prelude.odin"
+    package name
     import "lib"
     import "net"
 
@@ -99,7 +107,7 @@ main :: proc() {
     net_Conflicting_Item :: net.Conflicting_Item
     ```
 
-    It is reccomended to rename or exclude entries which result in naming conflicts (see below). 
+    It is recommended to rename or exclude entries which result in naming conflicts (see below). 
 
 * Individual item renaming:
     ```go
@@ -110,6 +118,7 @@ main :: proc() {
     Error :: enum { ... }
 
     // "prelude.odin"
+    package name
     import "net"
 
     OtherItem :: net.Item
@@ -125,6 +134,7 @@ main :: proc() {
     Error :: enum { ... }
 
     // "prelude.odin"
+    package name
     import "net"
 
     OtherItem :: net.Item
@@ -139,6 +149,7 @@ main :: proc() {
     Error :: enum { ... }
 
     // "prelude.odin"
+    package name
     import "net"
 
     OtherItem :: net.Item
@@ -146,6 +157,22 @@ main :: proc() {
 
     To use whitelist mode, run `prude` with `-whitelist`. If using the library, set `is_whitelist` on the `Prelude` object before adding sources.
     `when` statements and files with file suffixes automatically use whitelist mode (See [Caveats](#caveats)).
+
+* Documentation embedding:
+    ```
+    prude lib -docs:README.md
+    ```
+
+    ```go
+    // "prelude.odin"
+
+    // # Prude - Odin Prelude Generator
+    // 
+    // A simple Odin tool...
+    package name
+    ```
+
+    This is useful if you have an existing document that you'd like to embed into your top-level package documentation. If you write that manually, you're better off including that in a `docs.odin` file or something.
 
 ### Caveats
 
