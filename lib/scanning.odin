@@ -97,6 +97,10 @@ parse_docs_from_file :: proc(
 // Writes prelude to file specified in `prelude.path`.
 output_to_file :: proc(p : ^Prelude) -> Error {
 	assert(p != nil)
+	if p.path == "" {
+		log.error("Prelude path was empty. Could not write file.")
+		return .Path_Empty
+	}
 	output := strings.builder_make(context.allocator) or_return
 	defer strings.builder_destroy(&output)
 	write_package(&output, p)

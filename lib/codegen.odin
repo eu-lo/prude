@@ -60,6 +60,10 @@ write_package :: proc(
 ) -> (
 	bytes_written : int,
 ) {
+	if prelude.name == "" {
+		log.error("Prelude name was empty, could not write package.")
+		return
+	}
 	bytes_written += strings.write_string(buffer, prelude.docs)
 	bytes_written += strings.write_string(buffer, "package ")
 	bytes_written += strings.write_string(buffer, prelude.name)

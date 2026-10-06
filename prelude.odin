@@ -60,8 +60,9 @@ Error :: lib.Error
 Scan_Error :: lib.Scan_Error
 
 // A collection of entries and sources associated with a package name. Used to generate a source code file.
-// Be sure to initialize with `prelude_init` (or allocate with `prelude_make`) and free with `prelude_destroy`.
-// Before using, set `name` and `path`.
+// Prude follows ZII (Zero-Is-Initialization).
+// `name` should be set before attempting to write the prelude to a string buffer, and `path` should be set before attempting to write it to a file.
+// If `allocator` is not set when the Prelude needs to allocate, `context.allocator` will be used.
 Prelude :: lib.Prelude
 
 // Allocates prelude on the heap and initializes it.

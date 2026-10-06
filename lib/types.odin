@@ -1,7 +1,6 @@
 package core
 
 import "base:runtime"
-import "core:log"
 import "core:os"
 
 // Errors than can occur during scanning and generation.
@@ -14,6 +13,8 @@ Error :: union {
 // An error that occured during the scanning phase.
 Scan_Error :: enum {
 	None,
+	// Tried to output prelude with an empty path.
+	Path_Empty,
 	// Attempted to scan a non-odin file. This only occurs when manually adding paths via `prelude_add_file`. Non-odin files read through `add_source` are skipped.
 	Non_Odin_File,
 	// Attempted to scan a path that did not lead to a file.
@@ -28,8 +29,9 @@ Scan_Error :: enum {
 }
 
 // A collection of entries and sources associated with a package name. Used to generate a source code file.
-// Be sure to initialize with `prelude_init` (or allocate with `prelude_make`) and free with `prelude_destroy`.
-// Before using, set `name` and `path`.
+// Prude follows ZII (Zero-Is-Initialization).
+// `name` should be set before attempting to write the prelude to a string buffer, and `path` should be set before attempting to write it to a file.
+// If `allocator` is not set when the Prelude needs to allocate, `context.allocator` will be used.
 Prelude :: struct {
 	entries :      [dynamic]Entry,
 	sources :      [dynamic]Source,
