@@ -18,6 +18,12 @@ git clone https://github.com/eu-lo/prude.git
 odin run prude -- ...
 ```
 
+Or you can use git subtrees:
+```
+git subtree add https://github.com/eu-lo/prude -P prude --squash
+odin run prude -- ...
+```
+
 ## Usage
 
 Prude can be used either as a CLI tool or as a library. Should you have any issues feel free to open a ticket here!
@@ -29,6 +35,7 @@ odin run prude -- lib      # If cloned to your project
 prude lib lib/core         # Prude does not scan sub-directories
 prude lib -docs:README.md  # Add file contents to package documentation
 prude src -target:lib.odin # Change target destination
+prude core -whitelist      # Run in whitelist mode
 ```
 
 Running `prude -help` prints:
@@ -72,9 +79,12 @@ main :: proc() {
     procedure :: proc() { ... }
     constant :: 10
 
+    Conflicting_Item :: struct { ... }
+
     package net
     OtherItem :: struct { ... }
     Error :: enum { ... }
+    Conflicting_Item :: enum { ... }
 
     // "prelude.odin"
     import "lib"
@@ -83,9 +93,13 @@ main :: proc() {
     Item :: lib.Item
     procedure :: lib.procedure
     constant :: lib.constant
+    Conflicting_Item :: lib.Conflicting_Item
     OtherItem :: net.OtherItem
     Error :: net.Error
+    net_Conflicting_Item :: net.Conflicting_Item
     ```
+
+    It is reccomended to rename or exclude entries which result in naming conflicts (see below). 
 
 * Individual item renaming:
     ```go
@@ -131,6 +145,7 @@ main :: proc() {
     ```
 
     To use whitelist mode, run `prude` with `-whitelist`. If using the library, set `is_whitelist` on the `Prelude` object before adding sources.
+    `when` statements and files with file suffixes automatically use whitelist mode (See [Caveats][#caveats]).
 
 ### Caveats
 
