@@ -45,6 +45,8 @@ output_to_file :: lib.output_to_file
 // The returned string needs to be freed by the caller.
 output_to_string :: lib.output_to_string
 
+is_path_default_whitelisted :: lib.is_path_default_whitelisted
+
 // Adds source to prelude using a specified path to directory.
 // `path` should be a directory.
 add_source :: lib.add_source

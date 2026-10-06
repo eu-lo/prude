@@ -136,6 +136,8 @@ main :: proc() {
 
 Prude *will* parse `when` statements and any declarations within them, but will force `whitelist` mode when doing so. Prude does **not** do any analysis of your code and so there isn't a safe way to properly import declarations within when statements. Typically, you should write a seperate file adjacent to the prelude yourself and manually maintain the compile-time conditions, but if you are sure it's safe to import a certain item you can add `@(tag = "prelude")` above it to force-import the item. If the same item is imported multiple times, Prude will not import it more than once.
 
+The above also applies to any files with [file suffixes](https://odin-lang.org/docs/overview/#file-suffixes).
+
 Here's an example of how this might work:
 
 ```go
@@ -144,10 +146,10 @@ package lib
 // Different layouts per architecture, but the import exists no matter what, so it's safe to let prude handle it.
 when ODIN_OS == .Windows {
     @(tag = "prelude")
-    Arch_Specific_Layout :: struct { ... }
+    arch_specific_proc :: proc (...) { ... }
 } else {
-    @(tag = "prelude")
-    Arch_Specific_Layout :: struct { ... }
+    @(tag = "prelude") // Technically this tag is unnecessary
+    arch_specific_proc :: proc (...) { ... }
 }
 
 // This is only conditionally computed. Because you can use more complex conditions (with custom defines and whatnot), prude ignores this by default.
@@ -158,9 +160,9 @@ when ODIN_DEBUG {
 // "prelude.odin"
 import "lib"
 
-Arch_Specific_Layout :: lib.Arch_Specific_Layout
+arch_specific_proc :: lib.arch_specific_proc
 
-// "prelude_footer.odin"
+// In a seperate, handwritten file, perhaps called "prelude_footer.odin"
 import "lib"
 
 // This ensures release builds aren't broken by prude

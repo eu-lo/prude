@@ -1,5 +1,7 @@
 package core
 
+// TODO: refactor procedures, reduce "abstraction meddling"
+
 import "base:runtime"
 import "core:fmt"
 import "core:log"
@@ -8,6 +10,9 @@ import "core:odin/parser"
 import "core:os"
 import "core:strings"
 
+// Derives a "package name" from sections of a path.
+// It joins, up to `level - 1` parts, subdirectory names with underscores, walking bottom-up from the deepest subdirectory to the thinnest.
+// This is used to disambiguate import names if they end up colliding.
 @(tag = "prelude:_")
 name_from_path :: proc(
 	path : string,
@@ -118,11 +123,81 @@ output_to_string :: proc(
 	return strings.clone(strings.to_string(output), allocator)
 }
 
+// Ensures ZII. Needs to be run anytime a prelude may allocate.
 @(private)
 __prelude_init :: proc(p : ^Prelude) {
 	if p.allocator == {} do p.allocator = context.allocator
 	if p.sources.allocator == {} do p.sources.allocator = p.allocator
 	if p.entries.allocator == {} do p.entries.allocator = p.allocator
+}
+
+@(tag = "prelude:_")
+__get_info_and_initial_path :: proc(
+	home_path : string,
+	source_path : string,
+) -> (
+	info : os.File_Info,
+	joined_path : string,
+	err : Error,
+) {
+	info = os.stat(source_path, context.temp_allocator) or_return
+	if info.type != .Directory do return {}, "", .Not_A_Directory
+
+	joined_path = os.join_path(
+		{os.dir(home_path), source_path},
+		context.temp_allocator,
+	) or_return
+
+	return info, joined_path, nil
+}
+
+@(tag = "prelude:_")
+__scan_source :: proc(p : ^Prelude, path : string, source : ^Source) -> Error {
+	dir := os.open(path) or_return
+	files := os.read_directory(dir, -1, context.temp_allocator) or_return
+	for file in files {
+		if file.type != .Regular do continue
+
+		fullpath := file.fullpath
+
+		fext := os.ext(fullpath)
+		if fext != ".odin" do continue
+
+		old_whitelisted := p.is_whitelist
+		if is_path_default_whitelisted(fullpath) {
+			p.is_whitelist = true
+		}
+		f := os.open(fullpath) or_return
+		add_file(p, source, f)
+		p.is_whitelist = old_whitelisted
+	}
+	return nil
+}
+
+is_path_default_whitelisted :: proc(path : string) -> bool {
+	fstem := os.stem(path)
+	// Names sourced from https://github.com/odin-lang/Odin/blob/master/src/build_settings.cpp
+	// I believe this includes all file suffixes.
+	if strings.ends_with(fstem, "_windows") do return true
+	if strings.ends_with(fstem, "_darwin") do return true
+	if strings.ends_with(fstem, "_linux") do return true
+	if strings.ends_with(fstem, "_freebsd") do return true
+	if strings.ends_with(fstem, "_openbsd") do return true
+	if strings.ends_with(fstem, "_netbsd") do return true
+	if strings.ends_with(fstem, "_wasi") do return true
+	if strings.ends_with(fstem, "_js") do return true
+	if strings.ends_with(fstem, "_orca") do return true
+	if strings.ends_with(fstem, "_freestanding") do return true
+
+	// Architecture suffixes
+	if strings.ends_with(fstem, "_amd64") do return true
+	if strings.ends_with(fstem, "_i386") do return true
+	if strings.ends_with(fstem, "_arm32") do return true
+	if strings.ends_with(fstem, "_arm64") do return true
+	if strings.ends_with(fstem, "_wasm32") do return true
+	if strings.ends_with(fstem, "_wasm64p32") do return true
+	if strings.ends_with(fstem, "_riscv64") do return true
+	return false
 }
 
 // Adds source to prelude using a specified path to directory.
@@ -131,29 +206,21 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 	assert(p != nil)
 	__prelude_init(p)
 
-	dir := os.open(path) or_return
-	info := os.stat(path, context.temp_allocator) or_return
-	defer os.file_info_delete(info, context.temp_allocator)
-	if info.type != .Directory do return .Not_A_Directory
-
-	joined_path := os.join_path(
-		{os.dir(p.path), path},
-		context.temp_allocator,
-	) or_return
+	info, joined_path := __get_info_and_initial_path(p.path, path) or_return
 	name, ok := name_from_path(joined_path, 0, p.allocator)
-	assert(ok)
+	assert(ok) // name_from_path() can't fail for level == 0, since len(x) is always over 0.
 
+	// Resolve name conflicts.
 	level, idx : int
-	for {
-		matched := false
+	outer: for {
+		// There are only a few sources at a time, so a linear search is fine.
 		for source in p.sources {
 			if source.name == name {
-				matched = true
 				level += 1
-				name, ok = name_from_path(joined_path, level)
+				name, ok = name_from_path(joined_path, level, p.allocator)
 				if !ok {
 					idx += 1
-					name = fmt.aprint(name, idx, sep = "")
+					name = fmt.aprint(name, idx, sep = "", allocator = p.allocator)
 				}
 				log.warnf(
 					"Source '%v' (at '%v') has name collision, resolved to '%v'",
@@ -161,9 +228,10 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 					joined_path,
 					name,
 				)
+				continue outer
 			}
 		}
-		if !matched do break
+		break
 	}
 
 	was_alloc : bool
@@ -174,6 +242,7 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 		-1,
 		allocator = p.allocator,
 	)
+	// If it wasn't an allocation, the string lives in temp_allocator and needs to be copied out.
 	if !was_alloc do joined_path = strings.clone(joined_path, p.allocator)
 
 	source := Source {
@@ -182,16 +251,7 @@ add_source :: proc(p : ^Prelude, path : string) -> Error {
 	}
 	log.debugf("New source: %v", source)
 
-	files := os.read_directory(dir, -1, context.temp_allocator) or_return
-	for file in files {
-		if file.type != .Regular do continue
-
-		fext := os.ext(file.fullpath)
-		if fext != ".odin" do continue
-
-		f := os.open(file.fullpath) or_return
-		add_file(p, &source, f)
-	}
+	__scan_source(p, path, &source) or_return
 
 	append(&p.sources, source)
 
@@ -214,6 +274,7 @@ add_file :: proc(p : ^Prelude, source : ^Source, file : ^os.File) -> Error {
 	ast_parser : parser.Parser
 	ast_file : ast.File
 	{
+		// Otherwise there is no way to cleanly free the parser lmao
 		context.allocator = context.temp_allocator
 		ast_file = ast.File {
 			src      = string(data),
@@ -250,6 +311,8 @@ __process_decl :: proc(
 	err : Error,
 ) {
 	assert(p != nil)
+	assert(decl != nil)
+	assert(source != nil)
 	__prelude_init(p)
 
 	log.debugf("Begin processing declaration")

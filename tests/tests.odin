@@ -1,8 +1,6 @@
 package tests
 
 import "../lib"
-import "core:fmt"
-import "core:log"
 import "core:testing"
 
 @(test)
@@ -137,6 +135,7 @@ test_whens :: proc(t : ^testing.T) {
 	expected_entries := [?]lib.Entry {
 		{name = "Outer_Struct", source = "whens.Outer_Struct"},
 		{name = "Forever_Struct", source = "whens.Forever_Struct"},
+		{name = "Include_This", source = "whens.Include_This"},
 	}
 
 	testing.expect_value(t, len(p.entries), len(expected_entries))
