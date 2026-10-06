@@ -50,7 +50,7 @@ Flags:
 import "prude"
 main :: proc() {
     p : prude.Prelude
-    prude.prelude_init(&p)
+    // ZII--this is ready to go
 
     // Set these before using
     p.name = "my_package"
