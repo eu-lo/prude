@@ -27,6 +27,10 @@ clean:
 test: clean
     odin test tests -define:ODIN_TEST_THREADS=1
 
+# Builds prelude. Run before committing.
+make-prelude: clean
+    odin run . -debug {{ COMMON_BUILD_FLAGS }} -- lib -docs:include.txt
+
 # Builds project in debug mode.
 build-debug: clean
     @mkdir -p {{ TARGET_DIR }}
