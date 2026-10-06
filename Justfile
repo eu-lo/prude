@@ -29,7 +29,7 @@ test: clean
 
 # Builds prelude. Run before committing.
 make-prelude: clean
-    odin run . -debug {{ COMMON_BUILD_FLAGS }} -- lib -docs:include.txt
+    odin run . -debug {{ COMMON_BUILD_FLAGS }} -- lib
 
 # Builds project in debug mode.
 build-debug: clean

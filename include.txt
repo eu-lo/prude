@@ -1,6 +1,0 @@
-A CLI tool and library for producing "prelude" files that lift declarations out of inner source packages.
-
-See documentation for `Prelude` struct or check out the README for information on where to start.
-
-One important thing to note is that internal allocations are made with `context.temp_allocator`, and anything that is stored in a `Prelude` is allocated using its stored allocator (which is by default `context.allocator`).
-Between calls to `add_source` and the like you are free to call `free_all` on the temp allocator, and once you're done with the `Prelude` destroy it using `prelude_destroy`.

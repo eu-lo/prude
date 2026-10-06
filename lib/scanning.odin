@@ -1,6 +1,7 @@
 package core
 
 // TODO: refactor procedures, reduce "abstraction meddling"
+// TODO: document procedures
 
 import "base:runtime"
 import "core:fmt"
