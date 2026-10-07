@@ -3,21 +3,25 @@
 A simple [Odin](https://odin-lang.org) tool for "lifting" declarations from inner packages into an upper package by way of a "prelude" file. I guess this can technically thought of as a header file generator for odin libraries.
 
 ## Quickstart
+
 ```
 git clone https://github.com/eu-lo/prude.git
 odin run prude -- path/to/lib 
 ```
 
 ## Rationale 
-This tool allows developers to idiomatically seperate code into a "src", "lib", or "core" folder, as is standard for most projects. Typically, doing this would require users of a library to manually path to said "src" folder in order to use it, and prevents Odin from automagically determining the name of the import. It's also an anti-pattern, forcing users to work around your internal project structure rather than letting the code describe itself. I've seen a few repos make this change anyway, however, because in the end, larger projects simply become hard to scan and work with when everything is placed into the project root.
 
-One solution to this would be to write a file in project root that re-exports symbols from the inner "src" package so that users can still clone-and-use without issue. The main issue is that this adds considerable friction to re-factoring; it essentially re-invents the concept of header files in odin. This is where Prude is designed to help: It parses a set of odin files within a folder or list of folders (i.e. a list of odin packages) and produces an odin file which re-exports every publically accessable declaration.
+This tool originally began as an internal package inside another project of mine. I wanted to seperate my code into a "lib" folder, as is standard for most projects. Typically, doing this would require users of my library to manually path to said folder in order to use it, and it would prevent Odin from automagically determining the name of the import for them. I feel like such an approach is also an anti-pattern, because it forces users to work around the internal project structure rather than letting the code describe itself. But, I wanted it anyway, and I've seen a few other Odin repos make this change too, despite the issues. 
 
-This tool should be used sparingly! Only include things which are necessary for users of your library--remember that they can still just manually import anything within the project--all Prude does is "lift" items to the "top-level". If your project is not intended to be used as a native library by others or has some other build system that is not as simple as "clone into your project and import", then this project may not be for you. Perhaps this could have other uses, but in the end it's just a simple tool built with the core library's parser package that I found useful. I hope it proves useful to you too.
+One solution to this would be to write a file in project root that re-exports symbols from the inner "lib" or "src" package so that users can still clone-and-use without issue. The main issue is that this adds considerable friction to re-factoring; it essentially re-invents the concept of header files in odin. This is where Prude is designed to help: It parses a set of odin files within a folder or list of folders (i.e. a list of odin packages) and produces an odin file which re-exports every publically accessable declaration.
+
+I do understand that this is sort of against the design of Odin, as it encourages "compartmentalization" and "code taxonomy" in ways that Odin is specifically designed to discourage. This tool isn't necessarily meant to circumvent this, and is only meant to make libraries more ergonomic to use and develop. Think of it more like a build tool than a distriution strategy.
+
+This project isn't for everyone! Remember that users of your library can still just manually import anything within the project--all Prude does is "lift" items to the "top-level". If your project is not intended to be used as a odin-native library or has some other build system that is not as simple as "clone into your project and import", then this project may not be for you. But in the end it's just a simple tool built with the core library's parser package that I found useful. I hope it proves useful to you too.
 
 ## Installation
 
-You can build the project with `odin build .`. The `Justfile` exists and contains various helper tasks whatnot (See [Contributing](#contributing)), but if you just want to build the project on your machine, `odin build .` will do just fine.
+You can build the project with `odin build .` (maybe with an `-o:speed` tacked on the end if you want). The `Justfile` is not needed for end users, and can be ignored if you don't change any of the code. (See [Development](#development) for a brief summary on what its for.)
 
 If you want to use this project as a library (perhaps in your build script, if you have one), or if you'd rather run it using `odin run`, clone it to your project directory and import it normally:
 ```
@@ -65,12 +69,12 @@ import "prude"
 main :: proc() {
     p : prude.Prelude
     // ZII--this is ready to go
+    prude.add_source(&p, "path/to/package")
 
-    // Set these before using
+    // Set these before writing prelude
     p.name = "my_package"
     p.path = "lib.odin"
 
-    prude.add_source(&p, "path/to/package")
     prude.output_to_file(&p)
     result := prude.output_to_string(&p) // Can also write to string
     // All of these return errors if any occured
@@ -89,7 +93,7 @@ main :: proc() {
     Conflicting_Item :: struct { ... }
 
     package net
-    OtherItem :: struct { ... }
+    Other_Item :: struct { ... }
     Error :: enum { ... }
     Conflicting_Item :: enum { ... }
 
@@ -102,7 +106,7 @@ main :: proc() {
     procedure :: lib.procedure
     constant :: lib.constant
     Conflicting_Item :: lib.Conflicting_Item
-    OtherItem :: net.OtherItem
+    Other_Item :: net.Other_Item
     Error :: net.Error
     net_Conflicting_Item :: net.Conflicting_Item
     ```
@@ -113,7 +117,7 @@ main :: proc() {
     ```go
     package net
 
-    OtherItem :: struct { ... }
+    Other_Item :: struct { ... }
     @(tag = "prelude:Net_Error")
     Error :: enum { ... }
 
@@ -121,15 +125,16 @@ main :: proc() {
     package name
     import "net"
 
-    OtherItem :: net.Item
-    Net_Error :: lib.Error
+    Other_Item :: net.Other_Item
+    Net_Error :: net.Error
     ```
+
 
 * Blacklist mode (on by default):
     ```go
     package net
 
-    OtherItem :: struct { ... }
+    Other_Item :: struct { ... }
     @(tag = "prelude:_")
     Error :: enum { ... }
 
@@ -137,7 +142,7 @@ main :: proc() {
     package name
     import "net"
 
-    OtherItem :: net.Item
+    Other_Item :: net.Other_Item
     ```
 
 * Whitelist mode:
@@ -145,14 +150,14 @@ main :: proc() {
     package net
 
     @(tag = "prelude")
-    OtherItem :: struct { ... }
+    Other_Item :: struct { ... }
     Error :: enum { ... }
 
     // "prelude.odin"
     package name
     import "net"
 
-    OtherItem :: net.Item
+    Other_Item :: net.Other_Item
     ```
 
     To use whitelist mode, run `prude` with `-whitelist`. If using the library, set `is_whitelist` on the `Prelude` object before adding sources.
@@ -185,7 +190,7 @@ Here's an example of how this might work:
 ```go
 package lib
 
-// Different layouts per architecture, but the import exists no matter what, so it's safe to let prude handle it.
+// Different per architecture, but the procedure exists no matter what, so it's safe to let prude handle it.
 when ODIN_OS == .Windows {
     @(tag = "prelude")
     arch_specific_proc :: proc (...) { ... }
@@ -213,9 +218,11 @@ when ODIN_DEBUG {
 }
 ```
 
-## Contributing
+Additionally, all import paths in the resulting odin file are made relative to the file, so moving folders around requires a regeneration of the prelude file.
 
-If you want to hack away on this, be my guest! Aside from the Odin toolchain, you also need [Just](https://just.systems). To see what you can do, run `just`. Each recipe contains a small description of what it does. 
+## Development
+
+If you want to hack away on this, be my guest! Aside from the Odin toolchain, you also need [Just](https://just.systems). To see what you can do, run `just`. Each recipe contains a small description of what it does. To run a debug build, use `just run-debug` (or `just rd`), and to test, use `just test`. To run linters, use `just check`, and to generate the prelude file (should be done before every commit but its an easy Amend or extra commit to fix it), use `just make-prelude`.
 
 ## License
 
